@@ -13,6 +13,7 @@
 #SBATCH --constraint=any-gpu
 #SBATCH --constraint=11GB
 #SBATCH --array=103,170,174,193,230,241,278,308,313,518
+# --array sets the $SLURM_ARRAY_TASK_ID variable, which is used to run the script with different architectures / networks
 
 
 module add openmind/singularity/2.5.1
@@ -22,7 +23,7 @@ model_path=/om2/user/francl/new_task_archs/new_task_archs_no_background_noise_80
 #Mdoel versions to test
 model_version=100000
 #Arch numbers to test
-offset=$SLURM_ARRAY_TASK_ID
+offset=$SLURM_ARRAY_TASK_ID  # This is the architecture ID!
 #Arch initalized
 initialization=0
 #regularizer="tf.contrib.layers.l1_regularizer(scale=0.001)"
@@ -56,13 +57,14 @@ stacked_channel=True
 
 
 
-trainingID=$offset
+trainingID=$offset  # This is the architecture ID!
 init=$initialization
 reg=$regularizer
 bkgd=$bkgd_train_path_pattern
 pattern=$train_path_pattern
 model=$model_version
 
+# -B / --bind: binds folders on the host to folders in the container; -B /om binds /om on the host to /om in the container
 #singularity exec --nv -B /om -B /nobackup -B /om2 tfv1.5.simg python -u call_model_training.py $trainingID
 #singularity exec --nv -B /om -B /nobackup -B /om2 tfv1.13_openmind.simg python -u call_model_testing_valid_pad.py $a
 SINGULARITYENV_LD_PRELOAD=/usr/lib/libtcmalloc.so.4 singularity exec --nv -B /om -B /nobackup -B /om2 tfv1.13_tcmalloc.simg python -u call_model_training_valid_pad_francl.py $trainingID $init "$reg" "$bkgd" "$pattern" "$model" "$model_path" "$SNR_max" "$SNR_min" "$manually_added" "$freq_label" "$sam_tones" "$transposed_tones" "$precedence_effect" "$narrowband_noise" "$stacked_channel" "$all_positions_bkgd" "$background_textures" "$testing"

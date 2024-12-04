@@ -45,7 +45,7 @@ exec("regularizer = "+ regularizer)
 bkgd_train_path_pattern = str(sys.argv[4])
 train_path_pattern = str(sys.argv[5])
 model_version=[]
-model_version = list(map(int,list((str(sys.argv[6]).split(',')))))
+model_version = list(map(int,list((str(sys.argv[6]).split(',')))))  # -> creates a list of integers
 model_path = str(sys.argv[7])
 SNR_max = int(sys.argv[8])
 SNR_min = int(sys.argv[9])
@@ -60,6 +60,40 @@ all_positions_bkgd = str2bool(sys.argv[17])
 background_textures = str2bool(sys.argv[18])
 testing = str2bool(sys.argv[19])
 
+# tf_record_CNN_spherical() params:
+# tone_version, -> False (set above)    -> False I think
+# itd_tones, -> False (set above)       -> False I think
+# ild_tones, -> False (set above)       -> False I think
+# X manually_added, -> Set through CLI  -> Not quite clear what this does, but prob False is ok
+# X freq_label,                         -> Unused, so False
+# X sam_tones,                          -> False I think
+# X transposed_tones,                   -> False I think
+# X precedence_effect,                  -> False I think
+# X narrowband_noise,                   -> False I think
+# X all_positions_bkgd,                 -> Unused, so False
+# X background_textures, (boolean!)     -> Assigns variable that is never used, so False
+# X testing,                            -> True
+# branched, -> False (set above)        -> Test both, but should work as there are 2 GPUs in the lab PC
+# zero_padded, -> True (set above)      -> Sets stim size to (78, 48000) which is overwritten by stacked_channel, so False
+# X stacked_channel,                    -> True
+# X model_version,                      -> Nr. of training iterations (can be a list), 100000
+# num_epochs, -> None (set above)       -> if testing=True overwritten to 1
+# -> Otherwise passed to tf_records_iterator(): how often to iterate over the dataset
+# X train_path_pattern,                 -> Pattern to .tfrecord files, e.g. '/path/to/train*.tfrecords'
+# X bkgd_train_path_pattern,            -> see above
+# X arch_ID,                            -> Architecture ID, Only printed on ResourceExhaustedError during training or testing, not used for anything else
+# config_array, -> config_array (set below)
+# files, -> files (set below)
+# num_files, -> num_files (set below)   -> Only used in training
+# newpath, -> newpath (set below)
+# X regularizer,                        -> Unsure what format (Tensor -> Tensor or None; but it's a CLI argument...?), try None for now
+# X SNR_max=40,                         -> 40
+# X SNR_min=5                           -> 5
+
+# Not in tf_record_CNN_spherical() params:
+# init,
+# model_path                            -> "Path to model folders"
+
 #newpath='/om2/user/francl/localization_runs/old_hrirs_no_hanning_window_valid_padding/arch_number_'+str(arch_ID)+'_init_'+str(init)
 if regularizer is None:
     newpath= model_path+'/arch_number_'+str(arch_ID)+'_init_'+str(init)
@@ -69,16 +103,23 @@ else:
 if not os.path.exists(newpath):
     os.mkdir(newpath)
 
+# Save all variables to a JSON file
 filtered_vars = allvars_filtered()
 with open(newpath+'/config.json','w') as fp:
     json.dump(filtered_vars,fp)
 
+# How can a file be loaded from in a folder that might have just been created?
+# config_array.npy is inside of each of the net1, net2, ... folders
+# So is this whole script only running one net? -> yes!
 config_array=np.load(newpath+'/config_array.npy')
 
+# Get number of non-json files in the folder
 files=(glob.glob(newpath+'/*'))
 files_filtered = [f for f in files if ".json" not in f]
 num_files=len(files_filtered)
 
+# It seems there's a while loop running somewhere that cals this script and after all nets are trained,
+# the training curve is saved to a json file, which is then checked for in a last run of this script
 if not testing and os.path.isfile(newpath+'/curve_no_resample_w_cutoff_vary_loc.json'):
     print("Training may be completed. Remove training curve JSON to continue.")
     sys.exit()

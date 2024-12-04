@@ -86,7 +86,7 @@ def tf_record_CNN_spherical(tone_version,itd_tones,ild_tones,manually_added,freq
     padding='VALID'
 
     #Downsampling Params
-    sr=48000
+    sr=8000
     cochleagram_sr=8000
     post_rectify=True
 
@@ -475,9 +475,29 @@ def tf_record_CNN_spherical(tone_version,itd_tones,ild_tones,manually_added,freq
     freq_pool =1
     k=2
     k_wide =8
-    
-    
-#    config_array=[[["/gpu:0"],['conv',[2,50,32],[2,1]],['relu'],['pool',[1,4]]],[["/gpu:1"],['conv',[4,20,64],[1,1]],['bn'],['relu'],['pool',[1,4]],['conv',[8,8,128],[1,1]],['bn'],['relu'],['pool',[1,4]],['conv',[8,8,256],[1,1]],['bn'],['relu'],['pool',[1,8]],['fc',512],['fc_bn'],['fc_relu'],['dropout'],['out',]]]
+
+    # config_array = [[["/gpu:0"],
+    #                  ['conv', [2, 50, 32], [2, 1]],
+    #                  ['relu'],
+    #                  ['pool', [1, 4]]],
+    #                 [["/gpu:1"],
+    #                  ['conv', [4, 20, 64], [1, 1]],
+    #                  ['bn'],
+    #                  ['relu'],
+    #                  ['pool', [1, 4]],
+    #                  ['conv', [8, 8, 128], [1, 1]],
+    #                  ['bn'],
+    #                  ['relu'],
+    #                  ['pool', [1, 4]],
+    #                  ['conv', [8, 8, 256], [1, 1]],
+    #                  ['bn'],
+    #                  ['relu'],
+    #                  ['pool', [1, 8]],
+    #                  ['fc', 512],
+    #                  ['fc_bn'],
+    #                  ['fc_relu'],
+    #                  ['dropout'],
+    #                  ['out', ]]]
 
 
 
@@ -684,7 +704,15 @@ def tf_record_CNN_spherical(tone_version,itd_tones,ild_tones,manually_added,freq
                              #latest_addition = max(files, key=os.path.getctime)
                              file_list=[]
                              for elem in files:
+                                 # files is a glob containing
+                                 # './model_weights/net<net_id>/config_array.npy'
+                                 # './model_weights/net<net_id>/model.ckpt-100000.data-00000-of-00001'
+                                 # './model_weights/net<net_id>/model.ckpt-100000.index'
+                                 # './model_weights/net<net_id>/config.json'
+                                 # and perhaps more
+
                                  if (elem.split("/")[-1]).split(".")[0] == 'model':
+                                     # -> Get the model files
                                      file_list.append(elem)
                              latest_addition = max(file_list, key=os.path.getctime)
                              latest_addition_name = latest_addition.split(".") [-2]
@@ -752,7 +780,7 @@ def tf_record_CNN_spherical(tone_version,itd_tones,ild_tones,manually_added,freq
 
     if testing:
         ##Testing loop
-        for stim in model_version:
+        for stim in model_version:  # Why called stim? It's a list of model versions...
             sess.run(combined_iter.initializer)
             print ("Starting model version: ", stim)
             batch_acc = []
