@@ -72,6 +72,7 @@ testing = str2bool(sys.argv[19])
 # X narrowband_noise,                   -> False I think
 # X all_positions_bkgd,                 -> Unused, so False
 # X background_textures, (boolean!)     -> Assigns variable that is never used, so False
+# -> Presumably if passing separate background noises instead of a combined background noise, saves background metadata to variable
 # X testing,                            -> True
 # branched, -> False (set above)        -> Test both, but should work as there are 2 GPUs in the lab PC
 # zero_padded, -> True (set above)      -> Sets stim size to (78, 48000) which is overwritten by stacked_channel, so False

@@ -578,7 +578,9 @@ def tf_record_CNN_spherical(tone_version,itd_tones,ild_tones,manually_added,freq
         cost = cost1 +cost2
     else:
         cost = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=out,labels=labels_batch_cost_sphere))
-    
+        # -> reduce_mean() returns a single value that is the mean of all elements in the tensor
+        # it is multi-threaded and designed to work on a batch of data
+
     if regularizer is not None:
         cost=tf.add(cost,reg_term)
 
