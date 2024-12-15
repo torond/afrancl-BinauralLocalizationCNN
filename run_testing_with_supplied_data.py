@@ -271,8 +271,8 @@ def tf_record_CNN_spherical():
         jsdict = json.loads(jsonMessage)
         feature = parse_nested_dictionary(jsdict, is_bkgd)
 
-        # dataset = build_tfrecords_iterator(num_epochs, train_path_pattern, is_bkgd, feature, narrowband_noise,
-        #                                    manually_added, STIM_SIZE, localization_bin_resolution, stacked_channel)
+        dataset = build_tfrecords_iterator(num_epochs, train_path_pattern, is_bkgd, feature, narrowband_noise,
+                                           manually_added, STIM_SIZE, localization_bin_resolution, stacked_channel)
         new_dataset = build_tfrecords_iterator(num_epochs, train_path_pattern, is_bkgd, feature, narrowband_noise,
                                            manually_added, STIM_SIZE, localization_bin_resolution, stacked_channel)
 
@@ -300,9 +300,9 @@ def tf_record_CNN_spherical():
         #                                         narrowband_noise, manually_added, BKGD_SIZE,
         #                                         localization_bin_resolution, stacked_channel)
 
-        # new_dataset = tf.data.Dataset.zip((dataset, dataset_bkgd))
+        new_dataset = tf.data.Dataset.zip((dataset, new_dataset))
 
-        # SNR = tf.random_uniform([],minval=SNR_min,maxval=SNR_max,name="snr_gen")
+        SNR = tf.random_uniform([],minval=SNR_min,maxval=SNR_max,name="snr_gen")
 
         # if stacked_channel:
         #     new_dataset = new_dataset.map(
@@ -481,7 +481,7 @@ def tf_record_CNN_spherical():
 
     #    config_array=[[["/gpu:0"],['conv',[2,50,32],[2,1]],['relu'],['pool',[1,4]]],[["/gpu:1"],['conv',[4,20,64],[1,1]],['bn'],['relu'],['pool',[1,4]],['conv',[8,8,128],[1,1]],['bn'],['relu'],['pool',[1,4]],['conv',[8,8,256],[1,1]],['bn'],['relu'],['pool',[1,8]],['fc',512],['fc_bn'],['fc_relu'],['dropout'],['out',]]]
 
-    # [L_channel,R_channel] = tf.unstack(subbands_batch,axis=3)
+    # -> Copied foreground into combined_iter_dict[1] which should be the background, just to get correct shape here
     [L_channel, R_channel] = tf.unstack(combined_iter_dict[0]['train/image'], axis=3)
     concat_for_downsample = tf.concat([L_channel, R_channel], axis=0)
     reshaped_for_downsample = tf.expand_dims(concat_for_downsample, axis=3)
@@ -521,7 +521,7 @@ def tf_record_CNN_spherical():
         if k != 'train/image' and k != 'train/image_height' and k != 'train/image_width':
             combined_dict_bkgd[k] = combined_iter_dict[1][k]
     combined_dict[0] = combined_dict_fg
-    combined_dict[1] = combined_dict_bkgd
+    combined_dict[1] = combined_dict_bkgd  # never used!
 
     # Testing small subbatch
     if sam_tones or transposed_tones:
