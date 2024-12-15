@@ -76,7 +76,7 @@ def tf_record_CNN_spherical():
     branched = False
     zero_padded = False
     stacked_channel = True
-    model_version = 100000
+    model_version = [100000]
     num_epochs = 1
     regularizer = None
 
