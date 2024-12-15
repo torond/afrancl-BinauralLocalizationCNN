@@ -384,14 +384,14 @@ def tf_record_CNN_spherical():
     cost = tf.reduce_mean(
         tf.nn.sparse_softmax_cross_entropy_with_logits(logits=out, labels=labels_batch_cost_sphere))
 
-    cond_dist = tf.nn.softmax(out)
+    pred_dist = tf.nn.softmax(out)
 
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
         update_grads = tf.train.AdamOptimizer(learning_rate=learning_rate, epsilon=1e-4).minimize(cost)
 
     # Evaluate model
-    correct_pred = tf.equal(tf.argmax(out, 1), tf.cast(labels_batch_cost_sphere, tf.int64))
+    pred_is_correct = tf.equal(tf.argmax(out, 1), tf.cast(labels_batch_cost_sphere, tf.int64))
     net_pred = tf.argmax(out, 1)
 
     init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
@@ -413,18 +413,23 @@ def tf_record_CNN_spherical():
         eval_vars = list(combined_dict[0].values())
         eval_keys = list(combined_dict[0].keys())
         while True:
-            pred, cd, e_vars, np_evaluated, lbcs_evaluated = sess.run([correct_pred, cond_dist, eval_vars, net_pred, labels_batch_cost_sphere])
-            # print(lbcs_evaluated, np_evaluated)
-            array_len = len(e_vars)
-            if isinstance(e_vars, list):
-                e_vars = list(zip(*e_vars))
-                batch_conditional += [(cond, var) for cond, var in zip(cd, e_vars)]
-                batch_acc += [(pd, ev) for pd, ev in zip(pred, e_vars)]
+            pic_evaluated, pd_evaluated, ev_evaluated, np_evaluated, lbcs_evaluated = sess.run([pred_is_correct, pred_dist, eval_vars, net_pred, labels_batch_cost_sphere])
+            print('pic_evaluated: ', pic_evaluated)
+            print('pd_evaluated: ', pd_evaluated)
+            print('ev_evaluated: ', ev_evaluated)
+            print('np_evaluated: ', np_evaluated)
+            print('lbcs_evaluated: ', lbcs_evaluated, '\n')
+
+            array_len = len(ev_evaluated)
+            if isinstance(ev_evaluated, list):
+                ev_evaluated = list(zip(*ev_evaluated))
+                batch_conditional += [(cond, var) for cond, var in zip(pd_evaluated, ev_evaluated)]
+                batch_acc += [(pd, ev) for pd, ev in zip(pic_evaluated, ev_evaluated)]
             else:
-                e_vars = np.array([np.squeeze(x) for x in e_vars])
-                split = np.vsplit(e_vars, array_len)
-                batch_conditional += [(cond, var) for cond, var in zip(cd, e_vars.T)]
-                split.insert(0, pred)
+                ev_evaluated = np.array([np.squeeze(x) for x in ev_evaluated])
+                split = np.vsplit(ev_evaluated, array_len)
+                batch_conditional += [(cond, var) for cond, var in zip(pd_evaluated, ev_evaluated.T)]
+                split.insert(0, pic_evaluated)
                 batch_acc += np.dstack(split).tolist()[0]
 
             step += 1  # +1 for each batch
