@@ -740,3 +740,6 @@ def tf_record_CNN_spherical():
     #
     sess.close()
     tf.reset_default_graph()
+
+if __name__ == "__main__":
+    tf_record_CNN_spherical()
