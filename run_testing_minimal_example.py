@@ -1,3 +1,4 @@
+import csv
 import os
 
 os.environ['TF_CUDNN_USE_AUTOTUNE'] = '0'
@@ -44,26 +45,23 @@ def write_batch_data(newpath, train_path_pattern, stim, batch_acc, batch_conditi
         json.dump(eval_keys, f)
 
 
-def tf_record_CNN_spherical():
+def tf_record_CNN_spherical(arch_ID, timestamp):
     # TODO
     #  - Populate parameters and remove from signature
     #  - change dataset loading to only use foreground data, i.e. disable combining
     #  - git clone my fork on the lab PC, load test data and net_weights to where they should be
 
     # Ex: /om/scratch/Sat/francl/bkgdRecords_textures_sparse_sampled_same_texture_expanded_set_44.1kHz_stackedCH_upsampled_anechoic/train*.tfrecords
-    train_path_pattern = '/home/neurobio/PycharmProjects/BinauralLocalizationCNN/examples/training_data/training-data_orig_mcdermott.tfrecord'
+    train_path_pattern = '/home/neurobio/Repositories/BinauralLocalizationCNN/data/test_subset_francl_gz/*'
     # bkgd_train_path_pattern = None
-    arch_ID = 1
+    # arch_ID = 2
     model_path = '/home/neurobio/PycharmProjects/BinauralLocalizationCNN/examples/net_weights'
-    newpath = model_path + '/net1'
+    newpath = model_path + '/net' +  str(arch_ID)
     config_array = np.load(newpath + '/config_array.npy')
 
     # bkgd_training_paths = glob.glob(bkgd_train_path_pattern)
     training_paths = glob.glob(train_path_pattern)
-
-
-    ###Do not change parameters below unless altering network###
-
+    print(training_paths)
 
     STIM_SIZE = [39, 48000, 2]
     BKGD_SIZE = [39, 48000, 2]
@@ -71,9 +69,6 @@ def tf_record_CNN_spherical():
     n_classes_recognition = 780
     localization_bin_resolution = 5
 
-    # Optimization Params
-    batch_size = 16
-    learning_rate = 1e-3
     # Change for network precision,must match input data type
     filter_dtype = tf.float32
     padding = 'VALID'
@@ -82,11 +77,6 @@ def tf_record_CNN_spherical():
     sr = 48000
     cochleagram_sr = 8000
     post_rectify = True
-
-    # Display interval training statistics
-    display_step = 25
-    # Changes how often data is saved to numpy arrays when dataset is large
-    write_step = 15625  # 250k examples
 
     dropout_training_state = False
     training_state = False
@@ -274,79 +264,6 @@ def tf_record_CNN_spherical():
 
         return downsampled_signal
 
-    def put_kernels_on_grid(kernel, pad=1):
-
-        '''Visualize conv. filters as an image (mostly for the 1st layer).
-        Arranges filters into a grid, with some paddings between adjacent filters.
-        Args:
-          kernel:            tensor of shape [Y, X, NumChannels, NumKernels]
-          pad:               number of black pixels around each filter (between them)
-        Return:
-          Tensor of shape [1, (Y+2*pad)*grid_Y, (X+2*pad)*grid_X, NumChannels].
-        '''
-
-        # get shape of the grid. NumKernels == grid_Y * grid_X
-        def factorization(n):
-            for i in range(int(sqrt(float(n))), 0, -1):
-                if n % i == 0:
-                    if i == 1: print('Who would enter a prime number of filters')
-                    return (i, int(n / i))
-
-        (grid_Y, grid_X) = factorization(kernel.get_shape()[3].value)
-        print('grid: %d = (%d, %d)' % (kernel.get_shape()[3].value, grid_Y, grid_X))
-
-        x_min = tf.reduce_min(kernel)
-        x_max = tf.reduce_max(kernel)
-        kernel = (kernel - x_min) / (x_max - x_min)
-
-        # pad X and Y
-        x = tf.pad(kernel, tf.constant([[pad, pad], [pad, pad], [0, 0], [0, 0]]), mode='CONSTANT')
-
-        # X and Y dimensions, w.r.t. padding
-        Y = kernel.get_shape()[0] + 2 * pad
-        X = kernel.get_shape()[1] + 2 * pad
-        x = tf.pad(kernel, tf.constant([[pad, pad], [pad, pad], [0, 0], [0, 0]]), mode='CONSTANT')
-
-        # X and Y dimensions, w.r.t. padding
-        Y = kernel.get_shape()[0] + 2 * pad
-        X = kernel.get_shape()[1] + 2 * pad
-
-        channels = kernel.get_shape()[2]
-
-        # put NumKernels to the 1st dimension
-        x = tf.transpose(x, (3, 0, 1, 2))
-        # organize grid on Y axis
-        x = tf.reshape(x, tf.stack([grid_X, Y * grid_Y, X, channels]))
-
-        # switch X and Y axes
-        x = tf.transpose(x, (0, 2, 1, 3))
-        # organize grid on X axis
-        x = tf.reshape(x, tf.stack([1, X * grid_X, Y * grid_Y, channels]))
-
-        # back to normal order (not combining with the next step for clarity)
-        x = tf.transpose(x, (2, 1, 3, 0))
-
-        # to tf.image_summary order [batch_size, height, width, channels],
-        #   where in this case batch_size == 1
-        x = tf.transpose(x, (3, 0, 1, 2))
-
-        # scaling to [0, 255] is not necessary for tensorboard
-        return x
-
-    # Many lines are commented out to allow for quick architecture changes
-    # TODO:This should be abstracted to arcitectures are defined by some sort of
-    # config dictionary or file
-
-    def gradients_with_loss_scaling(loss, loss_scale):
-        """Gradient calculation with loss scaling to improve numerical stability
-        when training with float16.
-        """
-
-        grads = [(grad[0] / loss_scale, grad[1]) for grad in
-                 tf.train.AdamOptimizer(learning_rate=learning_rate, epsilon=1e-4).compute_gradients(loss * loss_scale,
-                                                                                                     colocate_gradients_with_ops=True)]
-        return grads
-
     # -> Copied foreground into combined_iter_dict[1] which should be the background, just to get correct shape here
     [L_channel, R_channel] = tf.unstack(combined_iter_dict[0]['train/image'], axis=3)
     concat_for_downsample = tf.concat([L_channel, R_channel], axis=0)
@@ -380,18 +297,7 @@ def tf_record_CNN_spherical():
                                  combined_dict[0]['train/azim'])
     labels_batch_cost_sphere = tf.squeeze(labels_batch_sphere)
 
-
-    cost = tf.reduce_mean(
-        tf.nn.sparse_softmax_cross_entropy_with_logits(logits=out, labels=labels_batch_cost_sphere))
-
-    pred_dist = tf.nn.softmax(out)
-
-    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-    with tf.control_dependencies(update_ops):
-        update_grads = tf.train.AdamOptimizer(learning_rate=learning_rate, epsilon=1e-4).minimize(cost)
-
     # Evaluate model
-    pred_is_correct = tf.equal(tf.argmax(out, 1), tf.cast(labels_batch_cost_sphere, tf.int64))
     net_pred = tf.argmax(out, 1)
 
     init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
@@ -400,78 +306,43 @@ def tf_record_CNN_spherical():
     sess = tf.Session(config=config)
     sess.run(init_op)
 
-    ##Testing loop
-    ckpt_version = 100000
-    sess.run(combined_iter.initializer)
-    print("Starting model from checkpoint at", ckpt_version, "iterations.")
-    batch_acc = []
-    batch_conditional = []
-    saver = tf.train.Saver(max_to_keep=None)
-    saver.restore(sess, newpath + "/model.ckpt-" + str(ckpt_version))
-    step = 0
-    try:
-        eval_vars = list(combined_dict[0].values())
-        eval_keys = list(combined_dict[0].keys())
-        while True:
-            pic_evaluated, pd_evaluated, ev_evaluated, np_evaluated, lbcs_evaluated = sess.run([pred_is_correct, pred_dist, eval_vars, net_pred, labels_batch_cost_sphere])
-            print('pic_evaluated: ', pic_evaluated)
-            print('pd_evaluated: ', pd_evaluated)
-            print('ev_evaluated: ', ev_evaluated)
-            print('np_evaluated: ', np_evaluated)
-            print('lbcs_evaluated: ', lbcs_evaluated, '\n')
+    os.makedirs('output/tf_1_out_' + timestamp, exist_ok=True)
+    with open('output/tf_1_out_' + timestamp + '/net' + str(arch_ID) + '.csv', 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(['true_class', 'pred_class'])
 
-            array_len = len(ev_evaluated)
-            if isinstance(ev_evaluated, list):
-                ev_evaluated = list(zip(*ev_evaluated))
-                batch_conditional += [(cond, var) for cond, var in zip(pd_evaluated, ev_evaluated)]
-                batch_acc += [(pd, ev) for pd, ev in zip(pic_evaluated, ev_evaluated)]
-            else:
-                ev_evaluated = np.array([np.squeeze(x) for x in ev_evaluated])
-                split = np.vsplit(ev_evaluated, array_len)
-                batch_conditional += [(cond, var) for cond, var in zip(pd_evaluated, ev_evaluated.T)]
-                split.insert(0, pic_evaluated)
-                batch_acc += np.dstack(split).tolist()[0]
+        ckpt_version = 100000
+        sess.run(combined_iter.initializer)
+        print("Starting model from checkpoint at", ckpt_version, "iterations.")
+        saver = tf.train.Saver(max_to_keep=None)
+        saver.restore(sess, newpath + "/model.ckpt-" + str(ckpt_version))
+        try:
+            while True:
+                np_evaluated, lbcs_evaluated = sess.run([net_pred, labels_batch_cost_sphere])
+                print('np_evaluated: ', np_evaluated)  # -> class that the network predicted
+                print('lbcs_evaluated: ', lbcs_evaluated, '\n')  # -> true class
+                for true_class, pred_class in zip(lbcs_evaluated, np_evaluated):
+                    writer.writerow([true_class, pred_class])
 
-            step += 1  # +1 for each batch
-            if step % display_step == 0:  # display_step=25 -> every 25*16 = 400 steps
-                print("Iter " + str(
-                    step * batch_size))
-            # Probably not going to reach here anyways for now
-            if (step + 1) % write_step == 0:  # write_step=15625 -> every 15625*16 = 250K steps
-                print("writing batch data at step: {}".format(step))
-                write_batch_data(newpath, train_path_pattern, ckpt_version, batch_acc, batch_conditional, eval_keys,
-                                 step)
-                print("Data written")
-                batch_acc = []
-                batch_conditional = []
-            if step == 500000:
-                print("Break!")
-                break
-    except tf.errors.ResourceExhaustedError:
-        print("Out of memory error")
-        error = "Out of memory error"
-        with open(newpath + '/test_error_{}.json'.format(ckpt_version), 'w') as f:
-            json.dump(arch_ID, f)
-            json.dump(error, f)
-    except tf.errors.OutOfRangeError:
-        print("Out of Range Error. Optimization Finished")
+                # print('ev_evaluated: ', ev_evaluated)  # -> network prediction
+                # -> list of 2 lists for elev and azim, each list contains lists with single elements containing the value
+                # Weirdly elevation classes are 0, 2, 4, 6, 8, 10, 12 and not 0, 1, 2, 3, 4, 5, 6 as expected
+                # Azim classes are 0 to 71 (presumably)
 
-    finally:
-        if train_path_pattern.split("/")[-2] == 'testset':
-            stimuli_name = 'testset_' + train_path_pattern.split("/")[-3]
-        else:
-            stimuli_name = train_path_pattern.split("/")[-2]
-        np.save(newpath + '/plot_array_padded_{}_iter{}.npy'.format(stimuli_name, ckpt_version), batch_acc)
-        np.save(newpath + '/batch_conditional_{}_iter{}.npy'.format(stimuli_name, ckpt_version), batch_conditional)
-        acc_corr = [pred[0] for pred in batch_acc]
-        acc_accuracy = sum(acc_corr) / len(acc_corr)
-        with open(newpath + '/accuracies_test_{}_iter{}.json'.format(stimuli_name, ckpt_version), 'w') as f:
-            json.dump(acc_accuracy, f)
-        with open(newpath + '/keys_test_{}_iter{}.json'.format(stimuli_name, ckpt_version), 'w') as f:
-            json.dump(eval_keys, f)
+        except tf.errors.ResourceExhaustedError:
+            print("Out of memory error")
+            error = "Out of memory error"
+            with open(newpath + '/test_error_{}.json'.format(ckpt_version), 'w') as f:
+                json.dump(arch_ID, f)
+                json.dump(error, f)
+        except tf.errors.OutOfRangeError:
+            print("Out of Range Error. Optimization Finished")
 
     sess.close()
     tf.reset_default_graph()
 
 if __name__ == "__main__":
-    tf_record_CNN_spherical()
+    timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+    for arch_ID in range(1, 11):
+        print('Testing net ' + str(arch_ID))
+        tf_record_CNN_spherical(arch_ID, timestamp)
